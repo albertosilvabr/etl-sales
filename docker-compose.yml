@@ -1,0 +1,20 @@
+version: "3"
+services:
+  mysql:
+    container_name: "mysql"
+    image: mysql:latest
+    volumes:
+      - "./mysql-data/db:/var/lib/mysql" 
+    restart: always
+    ports:
+      - 3306:3306          
+    environment: 
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: sales
+      MYSQL_USER: seller
+      MYSQL_PASSWORD: sellerpass
+    networks:
+      -  sales-network
+networks:
+   sales-network:
+    driver: bridge
