@@ -1,20 +1,111 @@
-version: "3"
+version: '3.7'
 services:
-  mysql:
-    container_name: "mysql"
-    image: mysql:latest
-    volumes:
-      - "./mysql-data/db:/var/lib/mysql" 
+  postgres:
+    container_name: airflow-postgres
+    image: 'postgres:9.6'
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+  airflow:
+    container_name: airflow-webserver
+    image: 'puckel/docker-airflow:1.10.9'
     restart: always
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Local
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+    volumes:
+      - './dags:/usr/local/airflow/dags'
     ports:
-      - 3306:3306          
-    environment: 
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: sales
-      MYSQL_USER: seller
-      MYSQL_PASSWORD: sellerpass
-    networks:
-      -  sales-network
-networks:
-   sales-network:
-    driver: bridge
+      - '8080:8080'
+    command: webserver
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - '[ -f /usr/local/airflow/airflow-webserver.pid ]'
+      interval: 30s
+      timeout: 30s
+      retries: 3
+  shopping-db:
+    container_name: shopping-db
+    image: 'postgres:9.6'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespass
+      POSTGRES_DB: store
+    ports:
+      - '5432:5432'
+    volumes:
+      - './pg-data:/var/lib/postgresql/data'
+      - './pg-config:/etc/postgresql'
+  spark-master:
+    image: 'bitnami/spark:3.2.1'
+    user: root
+    hostname: spark
+    container_name: spark
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - '8081:8080'
+      - '7077:7077'
+    deploy:
+      resources:
+        limits:
+          memory: 500MB
+  spark-worker:
+    image: 'bitnami/spark:3.2.1'
+    user: root
+    hostname: spark-worker
+    container_name: spark-worker
+    environment:
+      - SPARK_MODE=worker
+      - 'SPARK_MASTER_URL=spark://spark:7077'
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    depends_on:
+      - spark-master
+    deploy:
+      resources:
+        limits:
+          memory: 1GB
+  minio:
+    container_name: "minio"
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - "./.minio_storage:/data"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniopass
+    command: server --console-address ":9001" /data
+  createbuckets:
+      image: minio/mc
+      depends_on:
+        - minio
+      entrypoint: >
+             /bin/sh -c "
+             /usr/bin/mc alias set myminio http://minio:9000 minio miniopass;
+             /usr/bin/mc mb myminio/raw;
+             /usr/bin/mc policy set public myminio/raw;
+             exit 0;
+             "
