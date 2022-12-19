@@ -116,18 +116,10 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniopass
     command: server --console-address ":9001" /data
-  createbuckets:
-      image: minio/mc
-      networks:
-          - shopping-network      
-      depends_on:
-        - minio
-      entrypoint: >
-             /bin/sh -c "
-             /usr/bin/mc alias set myminio http://minio:9000 minio miniopass;
-             /usr/bin/mc mb myminio/raw;
-             /usr/bin/mc policy set public myminio/raw;
-             exit 0;
-             "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3    
 networks:
     shopping-network:             
