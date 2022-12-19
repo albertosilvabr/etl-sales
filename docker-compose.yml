@@ -7,6 +7,8 @@ services:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
       - POSTGRES_DB=airflow
+    networks:
+        - shopping-network      
     logging:
       options:
         max-size: 10m
@@ -28,6 +30,8 @@ services:
       - './dags:/usr/local/airflow/dags'
     ports:
       - '8080:8080'
+    networks:
+        - shopping-network      
     command: webserver
     healthcheck:
       test:
@@ -45,6 +49,8 @@ services:
       POSTGRES_DB: store
     ports:
       - '5432:5432'
+    networks:
+        - shopping-network      
     volumes:
       - './pg-data:/var/lib/postgresql/data'
       - './pg-config:/etc/postgresql'
@@ -59,9 +65,14 @@ services:
       - SPARK_RPC_ENCRYPTION_ENABLED=no
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
+    volumes:
+      - "./spark/app:/usr/local/spark/app"
+      - "./spark/resources:/usr/local/spark/resources"      
     ports:
       - '8081:8080'
       - '7077:7077'
+    networks:
+        - shopping-network      
     deploy:
       resources:
         limits:
@@ -73,13 +84,18 @@ services:
     container_name: spark-worker
     environment:
       - SPARK_MODE=worker
-      - 'SPARK_MASTER_URL=spark://spark:7077'
+      - SPARK_MASTER_URL=spark://spark:7077
       - SPARK_WORKER_MEMORY=1G
       - SPARK_WORKER_CORES=1
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - SPARK_RPC_ENCRYPTION_ENABLED=no
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
+    volumes:
+      - "./spark/app:/usr/local/spark/app"
+      - "./spark/resources:/usr/local/spark/resources"
+    networks:
+      - shopping-network      
     depends_on:
       - spark-master
     deploy:
@@ -92,14 +108,18 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
+    networks:
+        - shopping-network      
     volumes:
-      - "./.minio_storage:/data"
+      - "./minio_storage:/data"
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniopass
     command: server --console-address ":9001" /data
   createbuckets:
       image: minio/mc
+      networks:
+          - shopping-network      
       depends_on:
         - minio
       entrypoint: >
@@ -109,3 +129,5 @@ services:
              /usr/bin/mc policy set public myminio/raw;
              exit 0;
              "
+networks:
+    shopping-network:             
