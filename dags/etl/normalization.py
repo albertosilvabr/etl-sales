@@ -22,7 +22,7 @@ def main():
     
     for obj in objects:        
     
-        file_name = obj.object_name.replace(f"{BUCKET_BASE}/","").replace(".csv","")
+        file_name = obj.object_name.replace(f"{LANDING_ZONE}/","").replace(".csv","")
         
         df_csv = readCSV(spark, BUCKET_LANDING + obj.object_name)
         
